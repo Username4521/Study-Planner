@@ -129,7 +129,19 @@ input[type=checkbox]:focus-visible{outline:2px solid var(--chem);outline-offset:
 .q-ans{margin-top:8px;padding:10px;background:var(--bg3);border-left:3px solid var(--chem);border-radius:6px;font-size:12px;white-space:pre-wrap}
 .q-mark{margin-top:8px;padding:10px;background:var(--bg3);border-left:3px solid var(--phys);border-radius:6px;font-size:12px}
 .q-tabs{display:flex;gap:6px;margin:10px 0}.q-tabs button.on{background:var(--chem);color:var(--bg)}
-.nav-icon{display:inline-flex;align-items:center;opacity:.8}h1,.onboard-shell h2{font-family:Fraunces,Georgia,serif;letter-spacing:-.01em}</style>
+.nav-icon{display:inline-flex;align-items:center;opacity:.8}h1,.onboard-shell h2{font-family:Fraunces,Georgia,serif;letter-spacing:-.01em} 
+@media(max-width:760px){
+ .app{grid-template-columns:1fr}
+ .sidebar{position:relative;top:auto;height:auto;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;gap:4px}
+ .logo{width:100%;margin-bottom:6px}
+ .nav-section,.nav-sep{display:none}
+ .nav-item{width:auto;flex:1 1 auto;min-width:105px}
+ .main{padding:14px;min-height:0}
+ .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .grid-2,.ai-plan-grid{grid-template-columns:1fr}
+ .onboard-shell{padding:18px}
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -326,9 +338,18 @@ input[type=checkbox]:focus-visible{outline:2px solid var(--chem);outline-offset:
   <div class="card onboard-shell">
     <div class="onboard-step"><span class="active"></span><span class="active"></span><span class="active"></span> Personalise your plan</div>
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">Welcome to your Study Planner</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">A quick setup. Finishing this starts a fresh plan and clears any previous progress.</p>
+    <p id="ob-description" style="font-size:12px;color:var(--text2);margin-bottom:16px">Choose your subjects and study preferences to build your planner.</p>
     <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Your name</label>
-    <input type="text" id="ob-name" placeholder="e.g. Krishiv" style="margin-bottom:14px">
+    <input type="text" id="ob-name" placeholder="Enter your name" autocomplete="given-name" style="margin-bottom:14px">
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Your class or year (optional)</label>
+    <input type="text" id="ob-class" placeholder="e.g. Form 4, Year 11" style="margin-bottom:14px">
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Main study goal</label>
+    <select id="ob-goal" style="margin-bottom:14px">
+      <option value="Improve my grades">Improve my grades</option>
+      <option value="Prepare for exams">Prepare for exams</option>
+      <option value="Study consistently">Study consistently</option>
+      <option value="Master difficult topics">Master difficult topics</option>
+    </select>
     <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:6px">Subjects</label>
     <div id="ob-subjects" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px"></div>
     <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:6px">Study hours per subject each week</label>
@@ -627,7 +648,7 @@ function changeDay(d){S.currentDay=Math.max(1,Math.min(S.totalDays,S.currentDay+
 
 function renderDashboard(){
   var week=getWeek(),rem=S.totalDays-S.currentDay+1;
-  document.getElementById('dash-subtitle').textContent='Day '+S.currentDay+' of '+S.totalDays+' - Week '+week+' - '+rem+' days remaining';
+  document.getElementById('dash-subtitle').textContent=(S.userName?'Welcome back, '+S.userName+(S.studentClass?' · '+S.studentClass:'')+'. ':'')+'Day '+S.currentDay+' of '+S.totalDays+' - Week '+week+' - '+rem+' days remaining'+(S.studyGoal?' · Goal: '+S.studyGoal:'');
   document.getElementById('day-display').textContent='Day '+S.currentDay;
   document.getElementById('day-sub-display').textContent='Week '+week+' - Day '+(((S.currentDay-1)%7)+1)+' of 7';
   var totalD=0,totalT=0;
@@ -836,14 +857,24 @@ async function buildAISchedule(){
   var loc=localSchedule();loc.forEach(function(l){if(!valid.some(function(v){return v.subject===l.subject&&v.unit===l.unit;}))valid.push(l);});
   return valid;
 }
-function showOnboarding(){
+var onboardingEditMode=false;
+function showOnboarding(editMode){
+  onboardingEditMode=!!editMode;
+  var description=document.getElementById('ob-description');
+  if(description)description.textContent=onboardingEditMode
+    ?'Update your profile and subjects. Your completed topics, notes, mock scores and time logs will be kept.'
+    :'Choose your subjects and study preferences to build your planner.';
   var box=document.getElementById('ob-subjects');
   var selected=(S.subjects&&S.subjects.length)?S.subjects:Object.keys(ALL_SUBJECTS);
   obDraftWeekly={};Object.keys(ALL_SUBJECTS).forEach(function(k){obDraftWeekly[k]=(S.weeklyHours&&S.weeklyHours[k])||Math.max(.5,+((S.hours||{})[k]||1)*6);});
   box.innerHTML=Object.keys(ALL_SUBJECTS).map(function(k){var on=selected.indexOf(k)>=0;return '<label class="subject-choice '+(on?'selected':'')+'"><input type="checkbox" value="'+k+'" '+(on?'checked':'')+' onchange="onOnboardSubjectChange(this)"><span class="choice-tick">&#10003;</span><span style="color:var(--'+SUBJ_META[k].lcls+')">'+ALL_SUBJECTS[k].name+'</span></label>';}).join('');
   renderOnboardHours();
   document.getElementById('ob-name').value=S.userName||'';
-  document.getElementById('ob-start').value=new Date().toISOString().slice(0,10);
+  document.getElementById('ob-class').value=S.studentClass||'';
+  document.getElementById('ob-goal').value=S.studyGoal||'Improve my grades';
+  document.getElementById('ob-start').value=S.startDate||new Date().toISOString().slice(0,10);
+  document.getElementById('ob-days').value=S.totalDays||56;
+  document.getElementById('ob-hours').value=S.dailyHours||6;
   document.getElementById('onboard').style.display='flex';
 }
 var obDraftWeekly={};
@@ -854,11 +885,13 @@ function openProtectedOnboarding(){
   var code=prompt('Enter the setup access code:');
   if(code===null)return;
   if(code!=='1234'){alert('Incorrect setup code.');return;}
-  if(confirm('Open setup? Your progress is only cleared after you build the new plan.'))showOnboarding();
+  if(confirm('Open setup to update your profile and subjects? Your existing progress will be kept.'))showOnboarding(true);
 }
 async function finishOnboarding(){
   var err=document.getElementById('ob-err');err.style.display='none';
   var name=document.getElementById('ob-name').value.trim();
+  var studentClass=document.getElementById('ob-class').value.trim();
+  var studyGoal=document.getElementById('ob-goal').value;
   var subs=Array.prototype.slice.call(document.querySelectorAll('#ob-subjects input:checked')).map(function(x){return x.value;});
   var days=parseInt(document.getElementById('ob-days').value)||0;
   var hrs=parseFloat(document.getElementById('ob-hours').value)||0;
@@ -869,12 +902,26 @@ async function finishOnboarding(){
   var weeklyHours={};var invalidWeekly=false;subs.forEach(function(k){var input=document.getElementById('ob-wh-'+k);var v=input?parseFloat(input.value):0;if(!v||v<.5)invalidWeekly=true;weeklyHours[k]=v;});
   if(invalidWeekly){err.textContent='Enter at least 0.5 weekly hours for each chosen subject.';err.style.display='block';return;}
   var per=Math.round(hrs/subs.length*2)/2||0.5;var hours={};subs.forEach(function(k){hours[k]=per;});
-  S={onboarded:true,userName:name,subjects:subs,dailyHours:hrs,weeklyHours:weeklyHours,startDate:start,currentDay:1,totalDays:days,hours:hours,completed:{},timelog:{},mocks:{},specificRequest:'',subjectOrder:subs.slice(),notes:[],aiSchedule:null};
+  var previous=S;
+  var keepProgress=onboardingEditMode&&previous.onboarded;
+  S={
+    onboarded:true,userName:name,studentClass:studentClass,studyGoal:studyGoal,
+    subjects:subs,dailyHours:hrs,weeklyHours:weeklyHours,
+    startDate:keepProgress&&previous.startDate?previous.startDate:start,
+    currentDay:keepProgress?Math.min(previous.currentDay||1,days):1,
+    totalDays:days,hours:hours,
+    completed:keepProgress?(previous.completed||{}):{},
+    timelog:keepProgress?(previous.timelog||{}):{},
+    mocks:keepProgress?(previous.mocks||{}):{},
+    specificRequest:keepProgress?(previous.specificRequest||''):'',
+    subjectOrder:subs.slice(),notes:keepProgress?(previous.notes||[]):[],
+    aiSchedule:null
+  };
   applyActiveSubjects();syncDayFromDate();
   document.getElementById('ob-go').style.display='none';document.getElementById('ob-loading').style.display='block';
   try{S.aiSchedule=await buildAISchedule();}catch(e){S.aiSchedule=localSchedule();}
   saveS();
-  document.getElementById('onboard').style.display='none';document.getElementById('ob-go').style.display='';document.getElementById('ob-loading').style.display='none';
+  document.getElementById('onboard').style.display='none';document.getElementById('ob-go').style.display='';document.getElementById('ob-loading').style.display='none';onboardingEditMode=false;
   renderDashboard();renderSchedule();updateSidebarProgress();showPanel('dashboard');
 }
 
@@ -951,8 +998,8 @@ function renderSessionList(){
 
 // AI PLANNER
 function renderAIPlanner(){
-  var labels={math:'Mathematics',physics:'Physics',chemistry:'Chemistry',cs:'Computer Science',econ:'Economics',biology:'Biology',geography:'Geography',history:'History',english:'English Language',literature:'English Literature',business:'Business Studies'};
-  var colors={math:'math',physics:'phys',chemistry:'chem',cs:'cs',econ:'econ',biology:'bio',geography:'geo',history:'hist',english:'eng',literature:'lit',business:'bus'};
+  var labels={math:'Mathematics',physics:'Physics',chemistry:'Chemistry',cs:'Computer Science',econ:'Economics',biology:'Biology',geography:'Geography',history:'History',english:'English Language',literature:'English Literature',business:'Business Studies',kiswahili:'Kiswahili',civics:'Civics',agriculture:'Agriculture',french:'French',religious:'Religious Studies',accounting:'Accounting'};
+  var colors={math:'math',physics:'phys',chemistry:'chem',cs:'cs',econ:'econ',biology:'bio',geography:'geo',history:'hist',english:'eng',literature:'lit',business:'bus',kiswahili:'kis',civics:'civ',agriculture:'agr',french:'fre',religious:'rel',accounting:'acc'};
   var html='';
   S.subjectOrder.forEach(function(k,idx){
     var v=S.hours[k]||1;
@@ -1033,7 +1080,7 @@ async function generateAIPlan(){
   loading.style.display='none';
 }
 function renderAIDayPlan(plan){
-  var colors={Mathematics:'math',Physics:'phys',Chemistry:'chem','Computer Science':'cs',Economics:'econ',Biology:'bio',Geography:'geo',History:'hist','English Language':'eng','English Literature':'lit','Business Studies':'bus'};
+  var colors={Mathematics:'math',Physics:'phys',Chemistry:'chem','Computer Science':'cs',Economics:'econ',Biology:'bio',Geography:'geo',History:'hist','English Language':'eng','English Literature':'lit','Business Studies':'bus',Kiswahili:'kis',Civics:'civ',Agriculture:'agr',French:'fre','Religious Studies':'rel',Accounting:'acc'};
   var html='';
   plan.forEach(function(item){
     var isBreak=item.type==='break';var c=colors[item.subject]||'math';
@@ -1239,13 +1286,6 @@ function saveSettings(){
 function exportData(){var b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='keds-progress.json';a.click();}
 function resetAll(){if(confirm('Reset ALL progress? Cannot be undone.')){S.completed={};S.timelog={};saveS();renderDashboard();updateSidebarProgress();alert('Reset complete.');}}
 
-// INIT
-renderDashboard();
-renderSchedule();
-updateSidebarProgress();
-updateTimerDisplay();
-maybeSendDailyEmail();
-if(!S.onboarded)showOnboarding();
 </script>
 
 <script>
@@ -1342,27 +1382,76 @@ Object.assign(SUBJECTS, {
   {name:'Operations Management',topics:['Production Methods','Productivity','Quality Control','Inventory Management','Location Decisions']},
   {name:'Business Finance',topics:['Sources of Finance','Cash Flow Forecasts','Income Statements','Balance Sheets','Break-even Analysis']},
   {name:'External Influences',topics:['Economic Environment','Competition','Technology','Globalisation','Business Ethics and Sustainability']}
- ]}
-});
+  ]},
+  kiswahili:{name:'Kiswahili',color:'kis',target:'90%+',units:[
+   {name:'Ufahamu',topics:['Kusoma kwa Ufahamu','Kujibu Maswali ya Ufahamu','Muhtasari','Msamiati katika Muktadha']},
+   {name:'Sarufi',topics:['Aina za Maneno','Ngeli za Nomino','Upatanisho wa Kisarufi','Vitenzi na Nyakati','Viambishi','Uundaji wa Sentensi']},
+   {name:'Uandishi',topics:['Insha za Maelezo','Insha za Hoja','Barua Rasmi na za Kirafiki','Ripoti','Hotuba']},
+   {name:'Fasihi',topics:['Fasihi Simulizi','Fasihi Andishi','Ushairi','Tamthilia','Riwaya','Dhamira na Wahusika']},
+   {name:'Matumizi ya Lugha',topics:['Methali','Nahau','Misemo','Tamathali za Semi','Uhariri']}
+  ]},
+  civics:{name:'Civics',color:'civ',target:'90%+',units:[
+   {name:'Human Rights and Responsibilities',topics:['Basic Human Rights','Responsibilities of Citizens','Children’s Rights','Equality and Non-discrimination']},
+   {name:'Citizenship',topics:['Meaning of Citizenship','Types of Citizenship','Duties of a Good Citizen','National Identity']},
+   {name:'Democracy and Governance',topics:['Principles of Democracy','Rule of Law','Constitution','Separation of Powers','Good Governance']},
+   {name:'Government of Tanzania',topics:['Structure of Government','Central Government','Local Government','Elections and Political Participation']},
+   {name:'Culture and Social Development',topics:['Culture','Family and Socialisation','Gender Equality','National Heritage']},
+   {name:'Economic and Social Responsibilities',topics:['Work and Development','Environmental Conservation','Road Safety','Public Health Education']}
+  ]},
+  agriculture:{name:'Agriculture',color:'agr',target:'90%+',units:[
+   {name:'Introduction to Agriculture',topics:['Importance of Agriculture','Branches of Agriculture','Farming Systems','Agricultural Tools and Safety']},
+   {name:'Soil Science',topics:['Soil Formation','Soil Types','Soil Profile','Soil Fertility','Soil Conservation']},
+   {name:'Crop Production',topics:['Land Preparation','Seed Selection and Planting','Crop Management','Weed Control','Harvesting and Storage']},
+   {name:'Livestock Production',topics:['Types of Livestock','Animal Nutrition','Animal Housing','Breeding','Animal Health and Disease Prevention']},
+   {name:'Farm Management',topics:['Farm Records','Farm Budgeting','Marketing Farm Products','Farm Planning']},
+   {name:'Agricultural Ecology',topics:['Water Management','Climate and Agriculture','Pests and Diseases','Sustainable Agriculture']}
+  ]},
+  french:{name:'French',color:'fre',target:'90%+',units:[
+   {name:'Communication Basics',topics:['Greetings and Introductions','Numbers and Dates','Asking and Giving Directions','Everyday Expressions']},
+   {name:'Grammar Foundations',topics:['Nouns and Articles','Gender and Plurals','Adjectives','Subject Pronouns','Present Tense Verbs','Negation and Questions']},
+   {name:'Vocabulary',topics:['Family and Relationships','School and Education','Food and Shopping','Home and Daily Routine','Travel and Transport']},
+   {name:'Reading and Listening',topics:['Short Text Comprehension','Listening for Key Information','Understanding Instructions','Inferring Meaning']},
+   {name:'Writing and Speaking',topics:['Sentence Construction','Paragraph Writing','Informal Messages','Describing People and Places','Conversation Practice']}
+  ]},
+  religious:{name:'Religious Studies',color:'rel',target:'90%+',units:[
+   {name:'Beliefs and Teachings',topics:['Core Beliefs','Sacred Texts','Worship and Prayer','Religious Leaders']},
+   {name:'Moral and Ethical Issues',topics:['Honesty and Responsibility','Family and Community','Peace and Reconciliation','Care for the Vulnerable']},
+   {name:'Religion and Society',topics:['Religion and Culture','Religious Diversity','Interfaith Respect','Religion and Social Change']},
+   {name:'Religious Practices',topics:['Festivals and Observances','Rites of Passage','Places of Worship','Community Service']},
+   {name:'Applying Religious Teachings',topics:['Personal Conduct','Environmental Stewardship','Justice and Compassion','Contemporary Issues']}
+  ]},
+  accounting:{name:'Accounting',color:'acc',target:'90%+',units:[
+   {name:'Introduction to Accounting',topics:['Purpose of Accounting','Users of Accounting Information','Accounting Concepts and Principles','Business Documents']},
+   {name:'Books of Original Entry',topics:['Source Documents','Sales and Purchases Journals','Cash Book','Petty Cash Book','General Journal']},
+   {name:'Ledger Accounts',topics:['Double Entry','Posting to Ledgers','Balancing Accounts','Trial Balance']},
+   {name:'Financial Statements',topics:['Income Statement','Statement of Financial Position','Adjustments','Depreciation','Bad Debts and Provision']},
+   {name:'Control and Reconciliation',topics:['Bank Reconciliation','Control Accounts','Correction of Errors','Suspense Accounts']},
+   {name:'Cost and Management Accounting',topics:['Cost Classification','Break-even Analysis','Budgets','Cash Flow Forecasts']}
+  ]}
+ });
+['biology','literature','kiswahili','civics','agriculture','french','religious','accounting'].forEach(function(k){delete SUBJECTS[k];});
 var KEDS_EXTRA_META={
- biology:{lbl:'Biology',cls:'tb-bio',lcls:'bio',icon:'🧬'},
  geography:{lbl:'Geography',cls:'tb-geo',lcls:'geo',icon:'🌍'},
  history:{lbl:'History',cls:'tb-hist',lcls:'hist',icon:'📜'},
  english:{lbl:'English',cls:'tb-eng',lcls:'eng',icon:'✍️'},
- literature:{lbl:'Literature',cls:'tb-lit',lcls:'lit',icon:'📚'},
  business:{lbl:'Business',cls:'tb-bus',lcls:'bus',icon:'💼'}
 };
 Object.keys(KEDS_EXTRA_META).forEach(function(k){ALL_SUBJECTS[k]=SUBJECTS[k];SUBJ_META[k]=KEDS_EXTRA_META[k];});
+var KEDS_ALLOWED_SUBJECTS=['math','physics','chemistry','cs','econ','geography','history','english','business'];
+if(Array.isArray(S.subjects))S.subjects=S.subjects.filter(function(k){return KEDS_ALLOWED_SUBJECTS.indexOf(k)>=0;});
+S.subjectOrder=(S.subjectOrder||[]).filter(function(k){return KEDS_ALLOWED_SUBJECTS.indexOf(k)>=0;});
+
 var kedsNewColors={
- bio:['#e36b9a','#351a2a','#f3a9c5'],geo:['#4fb6a5','#102c29','#9ce1d7'],
- hist:['#d49b62','#302315','#f0c99b'],eng:['#83a7e8','#1b2740','#b7cefa'],
- lit:['#b68ad9','#2c1d38','#d9baf3'],bus:['#d6a84f','#302711','#f2d58e']
+ geo:['#4fb6a5','#102c29','#9ce1d7'],
+ hist:['#d49b62','#302315','#f0c99b'],
+ eng:['#83a7e8','#1b2740','#b7cefa'],
+ bus:['#d6a84f','#302711','#f2d58e']
 };
 var kedsStyle='';
 Object.keys(kedsNewColors).forEach(function(k){var c=kedsNewColors[k];kedsStyle+=':root{--'+k+':'+c[0]+';--'+k+'-bg:'+c[1]+';--'+k+'-light:'+c[2]+'} .fill-'+k+'{background:var(--'+k+')} .pill-'+k+'{background:var(--'+k+'-bg);color:var(--'+k+'-light)} .tb-'+k+'{background:var(--'+k+'-bg)} .wc-'+k+'{background:var(--'+k+'-bg);color:var(--'+k+'-light)} ';});
 var kedsStyleEl=document.createElement('style');kedsStyleEl.textContent=kedsStyle+'.today-grid{grid-template-columns:repeat(auto-fit,minmax(105px,1fr))}.week-row{grid-template-columns:60px repeat(auto-fit,minmax(90px,1fr))}';document.head.appendChild(kedsStyleEl);
 /* Add the new subjects to the existing navigation and create their topic panels. */
-var kedsNavAnchor=document.querySelector('.sidebar .nav-sep');
+var kedsSeps=document.querySelectorAll('.sidebar .nav-sep');var kedsNavAnchor=kedsSeps[1]||kedsSeps[0];
 Object.keys(KEDS_EXTRA_META).forEach(function(k){
  var meta=KEDS_EXTRA_META[k],sub=ALL_SUBJECTS[k];
  if(!document.getElementById('nav-'+k)){
@@ -1375,7 +1464,6 @@ Object.keys(KEDS_EXTRA_META).forEach(function(k){
   document.querySelector('.main').appendChild(p);
  }
 });
-if(Array.isArray(S.subjects)){Object.keys(KEDS_EXTRA_META).forEach(function(k){if(S.subjects.indexOf(k)<0)S.subjects.push(k);});}
 Object.keys(KEDS_EXTRA_META).forEach(function(k){if(S.subjectOrder.indexOf(k)<0)S.subjectOrder.push(k);if(S.hours[k]==null)S.hours[k]=1;});
 /* Build a balanced 8-week coverage map for the additional subjects. */
 Object.keys(KEDS_EXTRA_META).forEach(function(k){
@@ -1385,7 +1473,22 @@ Object.keys(KEDS_EXTRA_META).forEach(function(k){
  WEEKLY_PLAN.forEach(function(row,w){var ids=WEEK_UNIT_MAP[k][w+1]||[];row[k]=ids.length?ALL_SUBJECTS[k].units[ids[0]].name:'Revision & practice';});
 });
 applyActiveSubjects();
+var kedsTimerSubject=document.getElementById('timer-subject');
+if(kedsTimerSubject){
+  kedsTimerSubject.innerHTML=Object.keys(SUBJECTS).map(function(k){
+    return '<option value="'+k+'">'+SUBJECTS[k].name+'</option>';
+  }).join('');
+}
 if(document.getElementById('panel-dashboard')&&document.getElementById('panel-dashboard').classList.contains('active'))renderDashboard();
+// Final startup runs after every subject has been registered.
+renderDashboard();
+renderSchedule();
+updateSidebarProgress();
+updateTimerDisplay();
+maybeSendDailyEmail();
+if(!S.onboarded)showOnboarding();
+</script>
+
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
@@ -1395,8 +1498,6 @@ if ("serviceWorker" in navigator) {
       });
   });
 }
-</script>
-
 </script>
 </body>
 </html>
